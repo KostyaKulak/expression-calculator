@@ -4,7 +4,6 @@ function eval() {
 }
 
 function expressionCalculator(expr) {
-    var brackets = /\([\d+*=/]+\)/;
     expr = expr.replace(/\s*/g, "");
     var leftBrs = expr.match(/\(/g);
     var rightBrs = expr.match(/\)/g);
@@ -12,24 +11,74 @@ function expressionCalculator(expr) {
         (leftBrs != null && rightBrs == null) || (leftBrs == null && rightBrs != null)) {
         throw new Error("ExpressionError: Brackets must be paired");
     } else {
-        while (expr.match(brackets) != null) {
-            var exprBr = expr.match(brackets)[0];
-            expr = expr.replace(brackets, expressionCalculator(exprBr));
-        }
-        var multDiv = /(\d+(\*|\/))+\d+/g;
-        var multDivExprs = expr.match(multDiv);
-        if (multDivExprs != null) {
-            for (let i = 0; i < multDivExprs.length; i++) {
-                const el = multDivExprs[i];
-                expr = expr.replace(el, multDivide(el));
+        var multDivInBrackets = /\(\-?(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?))+\d+(\.\d+)?\)/g;
+        var addSubInBrackets = /\(\-?(\d+(\.\d+)?(\+|\-))+\d+(\.\d+)?\)/g;
+        var numbersInBrackets = expr.match(/\(\-?\d+(\.\d+)?\)/);
+        var exprInBrackets = /\(\-?(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?|\+|\-))+\d+(\.\d+)?\)/g;
+        while (expr.match(/^\-?\d+(\.\d+)?$/) == null) {
+            if (numbersInBrackets != null) {
+                for (let i = 0; i < numbersInBrackets.length; i++) {
+                    if (expr.match(/\(\-?\d+(\.\d+)?\)/) == null) {
+                        break
+                    }
+                    const el = numbersInBrackets[i];
+                    expr = expr.replace(el, el.replace(/\(|\)/g, ""));
+                }
+            }
+            if (expr.includes("(")) {
+                if (expr.match(multDivInBrackets) != null) {
+                    var multDivExprs = expr.match(multDivInBrackets)
+                        .map(it => it.replace(/\(|\)/g, ""));
+                    for (let i = 0; i < multDivExprs.length; i++) {
+                        const el = multDivExprs[i];
+                        expr = expr.replace("(" + el + ")", multDivide(el));
+                    }
+                }
+                if (expr.match(addSubInBrackets) != null) {
+                    var addSubExprs = expr.match(addSubInBrackets)
+                        .map(it => it.replace(/\(|\)/g, ""));
+                    for (let i = 0; i < addSubExprs.length; i++) {
+                        const el = addSubExprs[i];
+                        expr = expr.replace("(" + el + ")", addSubstract(el));
+                    }
+                }
+                if (expr.match(exprInBrackets) != null) {
+                    var exprs = expr.match(exprInBrackets)
+                        .map(it => it.replace(/\(|\)/g, ""));
+                    for (let i = 0; i < exprs.length; i++) {
+                        const el = exprs[i];
+                        expr = expr.replace("(" + el + ")", calcMixed(el));
+                    }
+                }
+            } else {
+                expr = calcMixed(expr);
+            }
+            if (expr.includes("+-")) {
+                expr = expr.replace(/\+\-/g, "-");
+            }
+            if (expr.includes("--")) {
+                expr = expr.replace(/\-\-/g, "+");
             }
         }
-        expr = addSub(expr);
     }
     return new Number(expr).valueOf();
 }
 
-function addSub(expr) {
+function calcMixed(expr) {
+    // var addSub = /(\d+(\.\d+)?(\+|\-))+\d+(\.\d+)?$/g;
+    var multDiv = /(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?))+\d+(\.\d+)?/g;
+    var multDivExprs = expr.match(multDiv);
+    if (multDivExprs != null) {
+        for (let i = 0; i < multDivExprs.length; i++) {
+            const el = multDivExprs[i];
+            expr = expr.replace(el, multDivide(el));
+        }
+    }
+    expr = addSubstract(expr);
+    return expr;
+}
+
+function addSubstract(expr) {
     var args = [];
     var number = "";
     for (let i = 0; i < expr.length; i++) {
@@ -38,11 +87,17 @@ function addSub(expr) {
             case "+":
             case "-":
                 if (number.length != 0) {
+                    if (expr[i - 1] == "e") {
+                        number += el;
+                        continue;
+                    }
                     var n = new Number(number).valueOf();
                     number = "";
                     args.push(n);
+                    args.push(el);
+                } else {
+                    number += el;
                 }
-                args.push(el);
                 break;
             default:
                 number += el;
