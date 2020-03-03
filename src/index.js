@@ -3,53 +3,30 @@ function eval() {
     return;
 }
 
+var multiplyDivideInBracketsRegExp = /\(\-?(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?))+\d+(\.\d+)?\)/g;
+var multiplyDivideRegExp = /(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?))+\d+(\.\d+)?/g;
+var addSubstractInBracketsRegExp = /\(\-?(\d+(\.\d+)?(\+|\-))+\d+(\.\d+)?\)/g;
+var numbersInBracketsRegExp = /\(\-?\d+(\.\d+)?\)/;
+var numberFullStrRegExp = /^\-?\d+(\.\d+)?$/;
+var anyBracketRegExp = /\(|\)/g;
+var mixedInBracketsRegExp = /\(\-?(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?|\+|\-))+\d+(\.\d+)?\)/g;
+
 function expressionCalculator(expr) {
     expr = expr.replace(/\s*/g, "");
-    var leftBrs = expr.match(/\(/g);
-    var rightBrs = expr.match(/\)/g);
-    if ((leftBrs != null && rightBrs != null && leftBrs.length != rightBrs.length) ||
-        (leftBrs != null && rightBrs == null) || (leftBrs == null && rightBrs != null)) {
+    var leftBrackets = expr.match(/\(/g);
+    var rightBrackets = expr.match(/\)/g);
+    if ((leftBrackets != null && rightBrackets != null && leftBrackets.length != rightBrackets.length) ||
+        (leftBrackets != null && rightBrackets == null) || (leftBrackets == null && rightBrackets != null)) {
         throw new Error("ExpressionError: Brackets must be paired");
     } else {
-        var multDivInBrackets = /\(\-?(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?))+\d+(\.\d+)?\)/g;
-        var addSubInBrackets = /\(\-?(\d+(\.\d+)?(\+|\-))+\d+(\.\d+)?\)/g;
-        var numbersInBrackets = expr.match(/\(\-?\d+(\.\d+)?\)/);
-        var exprInBrackets = /\(\-?(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?|\+|\-))+\d+(\.\d+)?\)/g;
-        while (expr.match(/^\-?\d+(\.\d+)?$/) == null) {
-            if (numbersInBrackets != null) {
-                for (let i = 0; i < numbersInBrackets.length; i++) {
-                    if (expr.match(/\(\-?\d+(\.\d+)?\)/) == null) {
-                        break
-                    }
-                    const el = numbersInBrackets[i];
-                    expr = expr.replace(el, el.replace(/\(|\)/g, ""));
-                }
+        while (expr.match(numberFullStrRegExp) == null) {
+            if (expr.match(numbersInBracketsRegExp) != null) {
+                simplifyBrackets(expr);
             }
             if (expr.includes("(")) {
-                if (expr.match(multDivInBrackets) != null) {
-                    var multDivExprs = expr.match(multDivInBrackets)
-                        .map(it => it.replace(/\(|\)/g, ""));
-                    for (let i = 0; i < multDivExprs.length; i++) {
-                        const el = multDivExprs[i];
-                        expr = expr.replace("(" + el + ")", multDivide(el));
-                    }
-                }
-                if (expr.match(addSubInBrackets) != null) {
-                    var addSubExprs = expr.match(addSubInBrackets)
-                        .map(it => it.replace(/\(|\)/g, ""));
-                    for (let i = 0; i < addSubExprs.length; i++) {
-                        const el = addSubExprs[i];
-                        expr = expr.replace("(" + el + ")", addSubstract(el));
-                    }
-                }
-                if (expr.match(exprInBrackets) != null) {
-                    var exprs = expr.match(exprInBrackets)
-                        .map(it => it.replace(/\(|\)/g, ""));
-                    for (let i = 0; i < exprs.length; i++) {
-                        const el = exprs[i];
-                        expr = expr.replace("(" + el + ")", calcMixed(el));
-                    }
-                }
+                expr = calculateInBrackets(expr, multiplyDivideInBracketsRegExp, multDivide);
+                expr = calculateInBrackets(expr, addSubstractInBracketsRegExp, addSubstract);
+                expr = calculateInBrackets(expr, mixedInBracketsRegExp, calcMixed);
             } else {
                 expr = calcMixed(expr);
             }
@@ -64,10 +41,31 @@ function expressionCalculator(expr) {
     return new Number(expr).valueOf();
 }
 
+function simplifyBrackets(expr) {
+    var numbersInBracketsExpr = expr.match(numbersInBracketsRegExp);
+    for (let i = 0; i < numbersInBracketsExpr.length; i++) {
+        if (expr.match(numbersInBracketsRegExp) == null) {
+            break
+        }
+        const el = numbersInBracketsExpr[i];
+        expr = expr.replace(el, el.replace(anyBracketRegExp, ""));
+    }
+}
+
+function calculateInBrackets(expr, regExp, actionCallback) {
+    if (expr.match(regExp) != null) {
+        var matchedExprs = expr.match(regExp)
+            .map(it => it.replace(anyBracketRegExp, ""));
+        for (let i = 0; i < matchedExprs.length; i++) {
+            const el = matchedExprs[i];
+            expr = expr.replace("(" + el + ")", actionCallback(el));
+        }
+    }
+    return expr;
+}
+
 function calcMixed(expr) {
-    // var addSub = /(\d+(\.\d+)?(\+|\-))+\d+(\.\d+)?$/g;
-    var multDiv = /(\d+(\.\d+)?(\*(\+|\-)?|\/(\+|\-)?))+\d+(\.\d+)?/g;
-    var multDivExprs = expr.match(multDiv);
+    var multDivExprs = expr.match(multiplyDivideRegExp);
     if (multDivExprs != null) {
         for (let i = 0; i < multDivExprs.length; i++) {
             const el = multDivExprs[i];
